@@ -24,7 +24,7 @@ python test_folder/icme_statistic_visualization.py \
   --att_norm "instancenorm" \
   --imgs_color "gray" \
   --att_scales 3 5 \
-  --attention_layers_num 2 \
+  --attention_layers_num 4 \
   --dataset_list [your dataset path , which contain train and val subfolders] \
   --attn_type "MLA" \
   --scale_factor 1 \
