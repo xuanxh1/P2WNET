@@ -33,7 +33,7 @@
     "eta_min": 1e-6,
     
     "n_heads": 4,
-    "attention_layers_num": 2,
+    "attention_layers_num": 4,
     "max_shape": [256, 256],
     "n_blocks": 4,
     "head_kernel_size": 1,
