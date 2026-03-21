@@ -9,7 +9,7 @@ P2WNet focuses on solving homography estimation problems in **Part-to-Whole** an
 The repository includes:
 - Complete training and inference code
 - Model definitions and training scripts
-- Evaluation tools and visualization scripts
+- Evaluation scripts and visualization scripts
   data loading modules
 
 ---
