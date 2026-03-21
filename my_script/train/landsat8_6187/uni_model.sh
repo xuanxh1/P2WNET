@@ -28,7 +28,7 @@ torchrun --nproc_per_node 2 --master_port=29504 train/MLA_ddp.py \
   --att_norm "instancenorm" \
   --imgs_color "gray" \
   --att_scales 3 5 \
-  --attention_layers_num 2 \
+  --attention_layers_num 4 \
   --dataset_list "[your dataset path , which contain train and val subfolders]" \
   --attn_type "MLA" \
   --inner_dis 0 \
