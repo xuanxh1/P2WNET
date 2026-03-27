@@ -13,8 +13,6 @@
     "weight_decay": 1e-6,
     "scale_factor": 1,
     "inner_dis": 0,
-    "init_reg_factor": 0.5,
-    "reg_factor_increment": 0.4,
     "offset_learning_ascending_interval":100,
     "use_outer_4_corner":true,
     "epsilon": 1e-8,
