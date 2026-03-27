@@ -33,7 +33,7 @@
     "eta_min": 1e-6,
     
     "n_heads": 4,
-    "attention_layers_num": 4,
+    "attention_layers_num": 2,
     "max_shape": [256, 256],
     "n_blocks": 4,
     "head_kernel_size": 1,
@@ -86,7 +86,7 @@
         "rho":32,
         "max_crop_size":[256,320],
         "dataset_list": [
-            "/data/xieshangxuan/master/img_matching/he_2025_11_30/data/training_data/simulation/v2/simulation_data_rmb_rename_combine_split"
+            ""
         ]
     },
 
@@ -94,8 +94,7 @@
         "positive_sample_scale_factor": 0.05,
         "alpha_focal_loss": 0.95,
         "gamma_focal_loss": 2.0,
-        "lambda_loss_offset": 0.25,
-        "lambda_loss_offset1": 0.5,
+        "lambda_loss_offset": 1e-3,
         "is_sofmax": false,
         "only_1_tl_points": false
     }
