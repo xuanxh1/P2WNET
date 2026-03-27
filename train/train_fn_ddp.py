@@ -9,7 +9,6 @@ from tqdm import tqdm
 from models.box_parser import get_k_pts_BoxParser
 import torch.nn as nn
 from utils.utils import get_obj_from_str,write_epoch_results
-# 设置torch打印精度为2位小数
 torch.set_printoptions(precision=2)
 from utils.save_best_model import save_best_checkpoint
 from train.utils_train.get_pts import *
@@ -18,7 +17,6 @@ from train.utils_train.get_error import *
 from utils.logger import save_metrics_periodically
 import time
 import torch.distributed as dist
-
 
 def train_one_epoch(
     model,
@@ -30,19 +28,12 @@ def train_one_epoch(
     box_parser: get_k_pts_BoxParser,
     size_sar,
     k,
-    reg_factor,
     inner_dis,
     scale_factor,
-    logger,
     dev: Device,
     max_grad_value=10,
 ) :
     model.train()
-    
-    # 初始化FP16相关组件
-    if args.use_fp16:
-        from torch.cuda.amp import GradScaler, autocast
-        scaler = GradScaler()
     
     # 统一管理所有统计量
     running_metrics = {
@@ -58,22 +49,14 @@ def train_one_epoch(
         "train_mace_by_usanc": 0.0,
     }
 
-    # 按数据集名称分类的指标字典
-    dataset_metrics = {}
-
     # 样本计数器（总体和按数据集）
     sample_counts = {"total": 0}
     
-    mace_by_usanc_list = []
     train_error_l2_overall = []
     train_error_l2_in = []
     train_error_l2_out = []
 
-    # 按数据集分类的误差列表
-    dataset_errors = {}
-
     idx = 0
-    reg_factor = torch.tensor(reg_factor,dtype=torch.float).to(dev, non_blocking=True)
     
     for imgs_search, imgs_template, tl_gt, H_matrix,*_ in tqdm(
         dataloader,
@@ -83,8 +66,6 @@ def train_one_epoch(
         colour="blue",
         mininterval=20,
     ):
-       
-        
         batch_size = tl_gt.shape[0]
         idx += batch_size
         sample_counts["total"] += batch_size
@@ -101,46 +82,20 @@ def train_one_epoch(
 
         optimizer.zero_grad()
         
-        # Forward pass with optional FP16
-        if args.use_fp16:
-            with autocast():
-                pred_sim_matrix ,pred_score_map, pred_offset_map,x_search,x_template = model(imgs_search, imgs_template)
-                
-                #Loss computation
-                loss_cls, loss_offset, loss_total = criterion(
-                    (pred_score_map, pred_offset_map),
-                    pts_gt,
-                    reg_factor,
-                )
-                sim_loss = sim_matrix_criterion(pred_sim_matrix, tl_gt, H_matrix)
-                loss_total = loss_total + sim_loss
-        else:
-            pred_sim_matrix ,pred_score_map, pred_offset_map,x_search,x_template = model(imgs_search, imgs_template)
-            
-            # Loss computation
-            loss_cls, loss_offset, loss_total = criterion(
-                (pred_score_map, pred_offset_map),
-                pts_gt,
-                reg_factor,
-            )
-            sim_loss = sim_matrix_criterion(pred_sim_matrix, tl_gt, H_matrix)
-            loss_total = loss_total + sim_loss
+       
+        pred_sim_matrix ,pred_score_map, pred_offset_map,x_search,x_template = model(imgs_search, imgs_template)
         
-        # Backward pass with optional FP16
-        if args.use_fp16:
-           
-            scaler.scale(loss_total).backward()
-            scaler.unscale_(optimizer)
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_value, norm_type=2.0)
-            scaler.step(optimizer)
-            scaler.update()
+        loss_cls, loss_offset, loss_total = criterion(
+            (pred_score_map, pred_offset_map),
+            pts_gt,
+        )
+        sim_loss = sim_matrix_criterion(pred_sim_matrix, tl_gt, H_matrix)
+        loss_total = loss_total + sim_loss
+        
+        loss_total.backward()
+        nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_value, norm_type=2.0)
+        optimizer.step()
 
-        else:
-            loss_total.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_grad_value, norm_type=2.0)
-            optimizer.step()
-
-        # Get predictions and compute metrics
         with torch.no_grad():
             pts_pred = box_parser(pred_score_map, pred_offset_map)
             l2_error, l2_error_in, l2_error_out = get_l2_error_in_and_out(
@@ -150,8 +105,6 @@ def train_one_epoch(
             )
             MACE = get_mace(pts_gt,pts_pred,k)
           
-
-            # Update running metrics (全局)
             running_metrics["train_loss_sim"] += sim_loss.item() * batch_size
             running_metrics["train_loss_cls"] += loss_cls.item() * batch_size
             running_metrics["train_loss_offset"] += loss_offset.item() * batch_size
@@ -161,9 +114,6 @@ def train_one_epoch(
             train_error_l2_out.extend(l2_error_out.tolist())
             running_metrics['train_mace'] += MACE.mean().item() * batch_size
             
-       
-        
-    # Calculate epoch averages (全局)
     total_samples = sample_counts["total"]
     avg_metrics = {key: value / total_samples for key, value in running_metrics.items()}
 
@@ -192,7 +142,6 @@ def vaildation_one_epoch(
     k,
     inner_dis,
     scale_factor,
-    use_outer_4_corner,
     logger,
     dev: Device
 ):
@@ -448,8 +397,7 @@ def train_n_epoches(
     best_mace = 10000
     best_mace_by_dlt = 10000
     best_mace_by_usanc = 10000
-    reg_factor = config["init_reg_factor"]
-
+    
     # 动态加载训练和验证函数
     train_fn_obj = get_obj_from_str(config['train_fn_name'])
     validation_fn_obj = get_obj_from_str(config['val_fn_name'])
@@ -461,12 +409,6 @@ def train_n_epoches(
             train_sampler.set_epoch(epoch)
         if is_distributed and val_sampler is not None:
             val_sampler.set_epoch(epoch)
-
-        # 更新正则化因子
-        if (epoch+1)%config['offset_learning_ascending_interval'] == 0:
-            reg_factor += config["reg_factor_increment"]
-            if master_process:
-                logger.info(f"正则化因子增加到: {reg_factor}")
 
         # 记录训练开始时间
         train_start_time = time.time()
@@ -482,11 +424,9 @@ def train_n_epoches(
             box_parser=box_parser,
             size_sar=config['training_template_img_size'],
             k=config['num_of_predited_pts'],
-            reg_factor=reg_factor,
             dev=dev,
             inner_dis=config['inner_dis'],
             scale_factor=config['scale_factor'],
-            logger=logger,
         )
         
         # 记录训练耗时
@@ -552,7 +492,6 @@ def train_n_epoches(
                 k=config['num_of_predited_pts'],
                 inner_dis=config['inner_dis'],
                 scale_factor=config['scale_factor'],
-                use_outer_4_corner=config['use_outer_4_corner'],
                 dev=dev,
                 logger=logger,
             )
@@ -643,14 +582,12 @@ def train_n_epoches(
                     logger=logger
                 )
             else:
-                # 非主进程也需要更新最佳指标的值，以保持所有进程状态一致
                 best_mace = min(best_mace, mace)
                 best_mace_by_dlt = min(best_mace_by_dlt, mace_by_dlt)
                 best_mace_by_usanc = min(best_mace_by_usanc, mace_by_usanc)
                 best_loss = min(best_loss, error_l2_val)
             
-        # Update learning rate - 所有进程都执行
         scheduler.step()
-        # Move to next epoch.
+  
         epoch += 1
        
