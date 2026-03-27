@@ -209,7 +209,6 @@ class Loss_Fn(nn.Module):
         self,
         pred: Tuple[Tensor, Tensor],
         pts: Tensor,
-        reg_factor: float,
     ) -> Tuple[Tensor, Tensor, Tensor]:
         """
         pred = (score_map_pred, offset_map_pred)
