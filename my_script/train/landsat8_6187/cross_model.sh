@@ -10,7 +10,7 @@ torchrun --nproc_per_node 2 --master_port=29506 train/MLA_ddp.py \
   --save_dir=$save_path \
   --config=$config_path \
   --num_workers=8 \
-  --epochs 1000 \
+  --epochs 1400 \
   --save_period=40 \
   --num_features=256 \
   --d_model=256 \
