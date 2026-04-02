@@ -182,7 +182,7 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=1000
+        default=1200
     )
     parser.add_argument(
         "--lr_decrease_period",
@@ -459,7 +459,7 @@ def parse_args():
     parser.add_argument(
         "--split",
         type=str,
-        default="val"
+        default="test"
     )
 
     parser.add_argument(
