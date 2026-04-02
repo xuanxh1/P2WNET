@@ -3,18 +3,18 @@
 根据配置创建训练和验证数据加载器，支持分布式训练
 """
 from re import S
-import sys
-sys.path.append('/data/xieshangxuan/master/img_matching/he_2025_11_30') 
-from utils.augmentation_utils import get_train_transform_fn, get_val_transform_fn
 import os
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from utils.augmentation_utils import get_train_transform_fn, get_val_transform_fn
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 from dataset.HomographyEstimationDataset import *
-import os
 from dataset.dataset_utils import *
 from torch.utils.data import DataLoader
 
-def get_val_dataloder(config,args,split='val'):
+def get_val_dataloder(config,args,split='test'):
     """
     创建验证数据加载器
     
@@ -29,10 +29,6 @@ def get_val_dataloder(config,args,split='val'):
     """
     val_transform_fn  = get_val_transform_fn(config)
     
-    if not split=='val':
-        split='test' 
-    
-
     dataset_val = Homography_Dataset_runtime(
         root_list = config["dataset_augmentations"]["dataset_list"],
         split=split,
@@ -86,8 +82,6 @@ def get_train_dataloder(config,args,split='train'):
     """
     train_transform_fn  = get_train_transform_fn(config)
 
-   
-   
     dataset_train = Homography_Dataset_runtime(
         root_list = config["dataset_augmentations"]["dataset_list"],
         split=split,
@@ -127,14 +121,14 @@ def get_train_dataloder(config,args,split='train'):
     else:
         return training_loader, None
 
-def get_dataloader(config,args,split='val'):
+def get_dataloader(config,args):
     """
     同时创建训练和验证数据加载器
     
     参数:
         config: 配置字典
         args: 命令行参数
-        split: 数据集划分，默认为'val'
+        split: 数据集划分
     
     返回:
         training_loader: 训练数据加载器
